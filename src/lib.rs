@@ -62,7 +62,7 @@ impl Shape for X12 {
     fn shape(&self, stream: &Stream) -> Result<Shaped, ShapeError> {
         let delimiters = delimiters(stream.bytes())?;
         let segments = segment::segments(stream.bytes(), &delimiters)
-            .map_err(|stop| stop.refused("edi-x12"))?;
+            .map_err(|stop| ShapeError::refused("edi-x12", stop))?;
         let message_type = segment::first(&segments, "ST")
             .and_then(|st| st.element(0, &delimiters))
             .filter(|kind| !kind.is_empty())
