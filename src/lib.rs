@@ -55,7 +55,7 @@ impl Shape for X12 {
         &["application/edi-x12"]
     }
 
-    fn recognises(&self, bytes: &[u8]) -> bool {
+    fn recognizes(&self, bytes: &[u8]) -> bool {
         envelope_holds(bytes)
     }
 
@@ -169,16 +169,16 @@ mod tests {
     }
 
     #[test]
-    fn the_shape_claims_x12_and_recognises_an_isa_whose_envelope_holds() {
+    fn the_shape_claims_x12_and_recognizes_an_isa_whose_envelope_holds() {
         assert_eq!(X12.technology(), "edi-x12");
         assert_eq!(X12.media_types(), &["application/edi-x12"]);
-        assert!(X12.recognises(ISA));
-        assert!(!X12.recognises(&ISA[..100]));
-        assert!(!X12.recognises(
+        assert!(X12.recognizes(ISA));
+        assert!(!X12.recognizes(&ISA[..100]));
+        assert!(!X12.recognizes(
             b"ISA is a word that opens this long enough text to pass the length \
 check but not the envelope check, which wants separators in place."
         ));
-        assert!(!X12.recognises(b"UNB+"));
+        assert!(!X12.recognizes(b"UNB+"));
 
         let shapes: [&dyn Shape; 1] = [&X12];
         let by_media = message::choose(&shapes, &stream(b"x", Some("application/EDI-X12")));
