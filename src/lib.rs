@@ -60,8 +60,9 @@ impl Shape for X12 {
     }
 
     fn shape(&self, stream: &Stream) -> Result<Shaped, ShapeError> {
-        let delimiters = delimiters(stream.bytes())?;
-        let segments = segment::segments(stream.bytes(), &delimiters)
+        let bytes = message::loaded(self.technology(), stream)?;
+        let delimiters = delimiters(bytes)?;
+        let segments = segment::segments(bytes, &delimiters)
             .map_err(|stop| ShapeError::refused("edi-x12", stop))?;
         let message_type = segment::first(&segments, "ST")
             .and_then(|st| st.element(0, &delimiters))
@@ -181,10 +182,15 @@ check but not the envelope check, which wants separators in place."
         assert!(!X12.recognizes(b"UNB+"));
 
         let shapes: [&dyn Shape; 1] = [&X12];
-        let by_media = message::choose(&shapes, &stream(b"x", Some("application/EDI-X12")));
+        let by_media =
+            message::choose(&shapes, &stream(b"x", Some("application/EDI-X12"))).expect("held");
         assert_eq!(by_media.map(Shape::technology), Some("edi-x12"));
-        let by_look = message::choose(&shapes, &stream(&order(), None));
+        let by_look = message::choose(&shapes, &stream(&order(), None)).expect("held");
         assert_eq!(by_look.map(Shape::technology), Some("edi-x12"));
-        assert!(message::choose(&shapes, &stream(b"STX=", None)).is_none());
+        assert!(
+            message::choose(&shapes, &stream(b"STX=", None))
+                .expect("held")
+                .is_none()
+        );
     }
 }
