@@ -10,6 +10,8 @@
 //!
 //! The walk is the Foundation's `message::segment`: this shape reads the
 //! envelope and brings the delimiters. A contract checks everything else.
+//! The `ISA` is read here once ([`delimiters`]), and the X12 contract reads
+//! an interchange's head by it too (ADR-0044, amendment 2026-11-15).
 
 use message::segment::{self, Delimiters};
 use message::{Shape, ShapeError, Shaped};
@@ -22,20 +24,37 @@ pub struct X12;
 /// The length of an `ISA` with its terminator: every element fixed width.
 pub const ISA_LENGTH: usize = 106;
 
-/// The delimiters the `ISA` envelope carries.
+/// Where in the `ISA` its separators stand: the element separator, the
+/// component separator ISA16 and the segment terminator.
+const SEPARATORS: [usize; 3] = [3, 104, 105];
+
+/// The delimiters the `ISA` envelope declares by position. X12 has no
+/// release character. The walk reads bytes, so every separator is ASCII,
+/// and the element separator and the terminator are neither one another
+/// nor a letter or digit.
 ///
 /// # Errors
-/// No `ISA` at the head, or one shorter than its 106 characters.
+/// No `ISA` at the head, one shorter than its 106 characters, one with a
+/// separator outside ASCII, or one without distinct separators.
 pub fn delimiters(bytes: &[u8]) -> Result<Delimiters, ShapeError> {
+    let refused = |reason: &str, at: usize| Err(ShapeError::new("edi-x12", reason).at(at));
     if !bytes.starts_with(b"ISA") {
-        return Err(ShapeError::new("edi-x12", "no ISA at the head").at(0));
+        return refused("no ISA at the head", 0);
     }
     let Some(isa) = bytes.get(..ISA_LENGTH) else {
-        return Err(
-            ShapeError::new("edi-x12", "an ISA shorter than its 106 characters").at(bytes.len()),
-        );
+        return refused("an ISA shorter than its 106 characters", bytes.len());
     };
-    Ok(Delimiters::new(isa[105], isa[3], isa[104]))
+    if let Some(at) = SEPARATORS.into_iter().find(|&at| !isa[at].is_ascii()) {
+        return refused("an ISA with a separator outside ASCII", at);
+    }
+    let [element, component, terminator] = SEPARATORS.map(|at| isa[at]);
+    if element.is_ascii_alphanumeric() {
+        return refused("an ISA without distinct separators", 3);
+    }
+    if element == terminator || terminator.is_ascii_alphanumeric() {
+        return refused("an ISA without distinct separators", 105);
+    }
+    Ok(Delimiters::new(terminator, element, component))
 }
 
 /// Whether the head is an `ISA` whose fixed-width envelope holds: the
@@ -167,6 +186,17 @@ mod tests {
         let cut = X12.shape(&stream(&cut, None)).expect_err("no terminator");
         assert_eq!(cut.offset, Some(106));
         assert_eq!(cut.reason, "a segment without its terminator");
+
+        let refused = |isa: &[u8]| delimiters(isa).map_err(|e| (e.reason, e.offset));
+        let without = |reason: &str, at| Err((reason.to_string(), Some(at)));
+        let wide = [&ISA[..105], "\u{a7}".as_bytes()].concat();
+        let outside = without("an ISA with a separator outside ASCII", 105);
+        assert_eq!(refused(&wide), outside);
+        let same = [&ISA[..105], b"*"].concat();
+        let distinct = "an ISA without distinct separators";
+        assert_eq!(refused(&same), without(distinct, 105));
+        let lettered = [&b"ISAX"[..], &ISA[4..]].concat();
+        assert_eq!(refused(&lettered), without(distinct, 3));
     }
 
     #[test]

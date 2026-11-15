@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/IlleNilsson/xmip-core-message-edi-x12"
-description = "ASC X12 shape: an ISA interchange as segments named by their tag, the first ST01 as the announced type. A xmip-core-message technology."
+description = "ASC X12 shape: an ISA interchange as segments named by their tag, the first ST01 as the announced type; the one reader of the ISA, which the X12 contract reads an interchange's head by. A xmip-core-message technology."
 publish = false
 
 [lib]
