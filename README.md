@@ -11,11 +11,6 @@ reads an interchange's head by it, the one technology it depends on
 (ADR-0044, amendment 2026-11-15), so the two read and refuse an `ISA` in
 the same words.
 
-## Toolchain
-
-`rust-toolchain.toml` pins the toolchain for the whole estate. Do not change it
-here.
-
 ## Verification
 
 The included workflow is manual-only and calls the versioned shared workflow at
